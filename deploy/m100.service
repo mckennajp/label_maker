@@ -1,0 +1,17 @@
+[Unit]
+Description=Ponek M100 label designer (HTTPS LAN)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=m100
+Group=m100
+WorkingDirectory=/opt/m100
+ExecStart=/opt/m100/.venv/bin/python -m m100 serve --lan --no-browser --http 8765
+Restart=on-failure
+RestartSec=3
+# Self-signed certs are written to /opt/m100/.certs on first start.
+
+[Install]
+WantedBy=multi-user.target

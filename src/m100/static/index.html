@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M100 Label</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">M100</div>
+    <div id="status" class="status unknown">not connected</div>
+    <button id="connect-bt" type="button">Connect Bluetooth</button>
+    <button id="connect-serial" type="button">Connect serial</button>
+    <button id="disconnect" type="button" hidden>Disconnect</button>
+    <label class="copies">Copies <input id="copies" type="number" min="1" max="20" value="1" /></label>
+    <button id="print" type="button">Print</button>
+  </header>
+
+  <main>
+    <aside>
+      <button type="button" data-add="text">Add text</button>
+      <button type="button" id="add-image">Add image</button>
+      <button type="button" id="add-border">Add border</button>
+      <input id="file" type="file" accept="image/*" hidden />
+      <button type="button" id="bring-front" disabled>Bring to front</button>
+      <button type="button" id="send-back" disabled>Send to back</button>
+      <button type="button" id="delete" disabled>Delete</button>
+      <hr />
+      <div id="props" class="props muted">Select an object</div>
+    </aside>
+    <section class="stage">
+      <div class="label-wrap">
+        <canvas id="label" width="320" height="240"></canvas>
+      </div>
+      <p class="hint">40 × 30 mm · drag to move · corner handles to scale · text stays above new images</p>
+    </section>
+  </main>
+
+  <div id="toast" hidden></div>
+  <div id="border-modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>Choose a border</strong>
+        <button type="button" id="border-close" aria-label="Close">×</button>
+      </div>
+      <h3>Decorative</h3>
+      <div id="borders-Decorative" class="gallery"></div>
+      <h3>Holiday</h3>
+      <div id="borders-Holiday" class="gallery"></div>
+    </div>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

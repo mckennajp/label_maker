@@ -1,0 +1,31 @@
+.certs/
+.venv/
+src/*.egg-info/
+refs/phomemo-tools/
+refs/web-based-label-studio/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Packet captures and dumps (keep the directory, not the payloads)
+captures/*.pcap
+captures/*.pcapng
+captures/*.log
+captures/*.btsnoop
+captures/*.bin
+captures/*.hex
+captures/*.txt
+!captures/README.md
+!captures/.gitkeep
+
+# Local notes that may contain MACs / serials
+field-notes.local.md
+
+# Node (if we later fork the web UI here)
+node_modules/
+dist/
+.DS_Store
+Thumbs.db
