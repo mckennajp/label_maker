@@ -1,8 +1,10 @@
-import { BluetoothLink, SerialLink, bluetoothAvailable, serialAvailable, ditherImageData } from "./printer.js";
+import { BluetoothLink, SerialLink, bluetoothAvailable, serialAvailable, ditherImageData, toLandscape } from "./printer.js";
 import { BORDERS, drawBorder } from "./borders.js";
 
-const W = 320;
-const H = 240;
+const LANDSCAPE = { w: 320, h: 240, wMm: 40, hMm: 30 };
+const PORTRAIT = { w: 240, h: 320, wMm: 30, hMm: 40 };
+let W = LANDSCAPE.w;
+let H = LANDSCAPE.h;
 const MIN_SIZE = 8;
 
 function handleSize() {
@@ -31,6 +33,56 @@ let drag = null;
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
+}
+
+function isPortrait() {
+  return H > W;
+}
+
+function mmLabel() {
+  return isPortrait() ? PORTRAIT : LANDSCAPE;
+}
+
+function applyCanvasSize() {
+  canvas.width = W;
+  canvas.height = H;
+  document.body.classList.toggle("portrait", isPortrait());
+  const hint = document.querySelector(".hint");
+  if (hint) {
+    hint.textContent = `${mmLabel().wMm} × ${mmLabel().hMm} mm · paste or add an image · drag to move · corner handles to scale`;
+  }
+  const btn = document.getElementById("orient");
+  if (btn) btn.textContent = isPortrait() ? "Landscape" : "Portrait";
+}
+
+function clampObjects() {
+  for (const o of objects) {
+    if (o.type === "border") {
+      o.x = 4;
+      o.y = 4;
+      o.w = W - 8;
+      o.h = H - 8;
+      continue;
+    }
+    const b = bounds(o);
+    if (o.type === "image") {
+      o.w = Math.min(o.w, W);
+      o.h = Math.min(o.h, H);
+      o._prep = null;
+    }
+    o.x = Math.max(0, Math.min(o.x, W - Math.min(b.w, W)));
+    o.y = Math.max(0, Math.min(o.y, H - Math.min(b.h, H)));
+  }
+}
+
+function toggleOrientation() {
+  const next = isPortrait() ? LANDSCAPE : PORTRAIT;
+  W = next.w;
+  H = next.h;
+  applyCanvasSize();
+  clampObjects();
+  draw();
+  renderProps();
 }
 
 function toast(msg, ms = 4000) {
@@ -106,6 +158,92 @@ function addText() {
   selected = objects.length - 1;
   draw();
   renderProps();
+}
+
+function addQr() {
+  const size = Math.min(120, W - 16, H - 16);
+  objects.push({
+    id: uid(),
+    type: "qr",
+    x: Math.round((W - size) / 2),
+    y: Math.round((H - size) / 2),
+    w: size,
+    h: size,
+    text: "https://example.com",
+  });
+  selected = objects.length - 1;
+  draw();
+  renderProps();
+}
+
+function escapeAttr(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function qrMatrix(text) {
+  const payload = text || "https://example.com";
+  if (typeof qrcode !== "function") throw new Error("QR library failed to load");
+  if (qrcode.stringToBytesFuncs?.["UTF-8"]) {
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs["UTF-8"];
+  }
+  const qr = qrcode(0, "M");
+  qr.addData(payload, "Byte");
+  qr.make();
+  const n = qr.getModuleCount();
+  const cells = [];
+  for (let y = 0; y < n; y++) {
+    const row = [];
+    for (let x = 0; x < n; x++) row.push(qr.isDark(y, x));
+    cells.push(row);
+  }
+  return cells;
+}
+
+function drawQr(o) {
+  let cells;
+  try {
+    cells = qrMatrix(o.text);
+  } catch (e) {
+    ctx.save();
+    ctx.strokeStyle = "#c00";
+    ctx.strokeRect(o.x, o.y, o.w, o.h);
+    ctx.fillStyle = "#c00";
+    ctx.font = "12px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText("QR too long", o.x + o.w / 2, o.y + o.h / 2);
+    ctx.restore();
+    return;
+  }
+  const n = cells.length;
+  const quiet = 2;
+  const mods = n + quiet * 2;
+  const side = Math.max(1, Math.min(o.w, o.h));
+  const cell = side / mods;
+  const ox = o.x + (o.w - side) / 2;
+  const oy = o.y + (o.h - side) / 2;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(ox, oy, side, side);
+  ctx.fillStyle = "#000";
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      if (cells[y][x]) {
+        ctx.fillRect(
+          ox + (x + quiet) * cell,
+          oy + (y + quiet) * cell,
+          cell + 0.05,
+          cell + 0.05,
+        );
+      }
+    }
+  }
+  ctx.restore();
 }
 
 function addImageFile(file) {
@@ -207,6 +345,8 @@ function draw(exporting = false) {
       ctx.fillText(o.text, o.x, o.y);
     } else if (o.type === "image" && o.img) {
       ctx.drawImage(preparedImage(o), o.x, o.y, o.w, o.h);
+    } else if (o.type === "qr") {
+      drawQr(o);
     } else if (o.type === "border") {
       drawBorder(ctx, o.kind, o.x, o.y, o.w, o.h);
     }
@@ -292,6 +432,19 @@ function renderProps() {
       o._prep = null;
       draw();
     };
+  } else if (o.type === "qr") {
+    propsEl.innerHTML = `
+      <label>QR data</label>
+      <textarea id="p-qr">${escapeAttr(o.text)}</textarea>
+      <label>Size</label>
+      <input id="p-qr-size" type="number" min="24" max="320" value="${Math.round(Math.min(o.w, o.h))}" />`;
+    propsEl.querySelector("#p-qr").oninput = (e) => { o.text = e.target.value; draw(); };
+    propsEl.querySelector("#p-qr-size").oninput = (e) => {
+      const s = Math.max(24, +e.target.value || 24);
+      o.w = s;
+      o.h = s;
+      draw();
+    };
   } else {
     propsEl.innerHTML = `
       <label>Width</label>
@@ -347,6 +500,12 @@ function applyScale(o, start, scale, corner) {
     else o.y = start.y;
     if (corner.includes("w")) o.x = anchor.x - now.w;
     else o.x = start.x;
+  } else if (o.type === "qr") {
+    const side = Math.max(MIN_SIZE, Math.max(w, h));
+    o.w = side;
+    o.h = side;
+    o.x = corner.includes("w") ? anchor.x - side : start.x;
+    o.y = corner.includes("n") ? anchor.y - side : start.y;
   } else {
     o.w = w;
     o.h = h;
@@ -453,7 +612,9 @@ function moveLayer(toFront) {
 
 document.querySelector("[data-add=text]").onclick = addText;
 document.getElementById("add-image").onclick = () => document.getElementById("file").click();
+document.getElementById("add-qr").onclick = addQr;
 document.getElementById("add-border").onclick = openBorderGallery;
+document.getElementById("orient").onclick = toggleOrientation;
 document.getElementById("border-close").onclick = () => {
   document.getElementById("border-modal").hidden = true;
 };
@@ -465,6 +626,28 @@ document.getElementById("file").onchange = (e) => {
   if (f) addImageFile(f);
   e.target.value = "";
 };
+
+window.addEventListener("paste", (ev) => {
+  const tag = document.activeElement?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  const items = ev.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) {
+        ev.preventDefault();
+        addImageFile(file);
+        return;
+      }
+    }
+  }
+  const file = [...(ev.clipboardData?.files || [])].find((f) => f.type.startsWith("image/"));
+  if (file) {
+    ev.preventDefault();
+    addImageFile(file);
+  }
+});
 deleteBtn.onclick = () => {
   if (selected < 0) return;
   objects.splice(selected, 1);
@@ -591,9 +774,10 @@ printBtn.onclick = async () => {
       toast(st.printComplete ? "Printed" : "Sent — check the printer");
     } else {
       draw(true);
-      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      const sheet = toLandscape(canvas);
+      const blob = await new Promise((res) => sheet.toBlob(res, "image/png"));
       draw();
-      const r = await fetch("/api/print?copies=" + copies, {
+      const r = await fetch("/api/print?copies=" + copies + "&width_mm=40&height_mm=30", {
         method: "POST",
         headers: { "Content-Type": "image/png" },
         body: blob,
@@ -610,6 +794,7 @@ printBtn.onclick = async () => {
   }
 };
 
+applyCanvasSize();
 addText();
 objects[0].text = "Hello";
 draw();

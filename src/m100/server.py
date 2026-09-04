@@ -96,6 +96,13 @@ class DesignerHandler(SimpleHTTPRequestHandler):
         qs = parse_qs(urlparse(self.path).query)
         copies = int((qs.get("copies") or ["1"])[0])
         copies = max(1, min(copies, 20))
+        def _mm(name, default):
+            try:
+                return float((qs.get(name) or [str(default)])[0])
+            except ValueError:
+                return default
+        width_mm = _mm("width_mm", 40.0)
+        height_mm = _mm("height_mm", 30.0)
         try:
             image = Image.open(BytesIO(raw)).convert("RGB")
         except Exception as e:
@@ -108,7 +115,9 @@ class DesignerHandler(SimpleHTTPRequestHandler):
             try:
                 if not self.printer.connected:
                     self.printer.connect()
-                st = self.printer.print_image(image, copies=copies)
+                st = self.printer.print_image(
+                    image, copies=copies, width_mm=width_mm, height_mm=height_mm
+                )
                 self._json(200, {**_status_json(st, True), "ok": True})
             except Exception as e:
                 self._json(500, {"ok": False, "error": str(e)})

@@ -79,7 +79,12 @@ def to_thermal_1bpp(image: Image.Image) -> Image.Image:
 
 
 def fit_to_label(image: Image.Image, geo: Geometry) -> Image.Image:
-    """Scale image to the 40×30 mm label box, then park it on the 384 px head."""
+    """Scale image to the 40×30 mm label box, then park it on the 384 px head.
+
+    Portrait bitmaps are rotated 90° CW so they fill landscape die-cut stock.
+    """
+    if image.height > image.width and geo.label_w_mm >= geo.label_h_mm:
+        image = image.transpose(Image.Transpose.ROTATE_270)
     box_w, box_h = geo.label_w_px, geo.label_h_px
     if image.mode == "1":
         gray = image.convert("L")

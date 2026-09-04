@@ -85,12 +85,17 @@ aside {
   background: var(--panel);
 }
 .props label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 12px; }
-.props input, .props select {
+.props input, .props select, .props textarea {
   width: 100%;
   background: var(--bg);
   color: var(--ink);
   border: 1px solid var(--line);
   padding: 6px;
+}
+.props textarea {
+  min-height: 4.5em;
+  resize: vertical;
+  font: 13px/1.35 ui-monospace, Consolas, monospace;
 }
 .props input[type="range"] {
   padding: 0;
@@ -116,6 +121,11 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   width: 640px;
   height: 480px;
   background: #fff;
+}
+body.portrait #label {
+  width: 480px;
+  height: 640px;
+}
   cursor: default;
   image-rendering: pixelated;
   touch-action: none;
@@ -226,5 +236,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
     width: 100%;
     height: auto;
     aspect-ratio: 320 / 240;
+  }
+  body.portrait #label {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 240 / 320;
   }
 }

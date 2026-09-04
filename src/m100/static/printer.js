@@ -122,7 +122,21 @@ export function ditherImageData(imageData, method = "floyd", brightness = 0, con
   return imageData;
 }
 
+/** Rotate a portrait design 90° CW onto 40×30 mm stock (full head width). */
+export function toLandscape(canvas) {
+  if (canvas.width >= canvas.height) return canvas;
+  const out = document.createElement("canvas");
+  out.width = canvas.height;
+  out.height = canvas.width;
+  const octx = out.getContext("2d");
+  octx.translate(out.width, 0);
+  octx.rotate(Math.PI / 2);
+  octx.drawImage(canvas, 0, 0);
+  return out;
+}
+
 export function encodeFromCanvas(canvas) {
+  canvas = toLandscape(canvas);
   const srcW = canvas.width;
   const srcH = canvas.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
