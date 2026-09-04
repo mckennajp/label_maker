@@ -53,22 +53,42 @@ class Geometry:
         return self.pad_top_px + self.label_h_px
 
 
+_GAMMA_LUT = [int(round(255 * ((i / 255) ** (1 / 1.3)))) for i in range(256)]
+
+
+def _thermal_gray(image: Image.Image) -> Image.Image:
+    """BT.601 gray with gamma 1.3 — same lift Phomymo uses for thermal midtones."""
+    if image.mode == "RGBA":
+        bg = Image.new("RGB", image.size, (255, 255, 255))
+        bg.paste(image, mask=image.split()[-1])
+        image = bg
+    gray = image.convert("L")
+    return gray.point(_GAMMA_LUT)
+
+
 def to_thermal_1bpp(image: Image.Image) -> Image.Image:
-    """Mode '1' where bit 1 = burn = original dark pixels."""
+    """Mode '1' where bit 1 = burn = original dark pixels.
+
+    Photos go through Floyd–Steinberg dithering so mid-grays survive as
+    a halftone instead of a hard 50% threshold.
+    """
     if image.mode == "1":
         return image
-    return ImageOps.invert(image.convert("L")).convert("1")
+    gray = _thermal_gray(image)
+    return ImageOps.invert(gray).convert("1", dither=Image.Dither.FLOYDSTEINBERG)
 
 
 def fit_to_label(image: Image.Image, geo: Geometry) -> Image.Image:
     """Scale image to the 40×30 mm label box, then park it on the 384 px head."""
     box_w, box_h = geo.label_w_px, geo.label_h_px
-    gray = image.convert("L")
-    gray.thumbnail((box_w, box_h), Image.Resampling.LANCZOS)
     if image.mode == "1":
-        src = gray.convert("1")
+        gray = image.convert("L")
+        gray.thumbnail((box_w, box_h), Image.Resampling.NEAREST)
+        src = gray.convert("1", dither=Image.Dither.NONE)
     else:
-        src = ImageOps.invert(gray).convert("1")
+        gray = _thermal_gray(image)
+        gray.thumbnail((box_w, box_h), Image.Resampling.LANCZOS)
+        src = ImageOps.invert(gray).convert("1", dither=Image.Dither.FLOYDSTEINBERG)
     label = Image.new("1", (box_w, box_h), 0)
     ox = (box_w - src.width) // 2
     oy = (box_h - src.height) // 2

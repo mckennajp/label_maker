@@ -1,4 +1,4 @@
-import { BluetoothLink, SerialLink, bluetoothAvailable, serialAvailable } from "./printer.js";
+import { BluetoothLink, SerialLink, bluetoothAvailable, serialAvailable, ditherImageData } from "./printer.js";
 import { BORDERS, drawBorder } from "./borders.js";
 
 const W = 320;
@@ -121,6 +121,9 @@ function addImageFile(file) {
       w: Math.max(MIN_SIZE, Math.round(img.width * scale)),
       h: Math.max(MIN_SIZE, Math.round(img.height * scale)),
       img,
+      dither: "floyd",
+      brightness: -10,
+      contrast: 40,
     };
     // Keep photos under text so labels can sit on top of a picture.
     const insertAt = lastImageIndex() + 1;
@@ -203,7 +206,7 @@ function draw(exporting = false) {
       ctx.textBaseline = "top";
       ctx.fillText(o.text, o.x, o.y);
     } else if (o.type === "image" && o.img) {
-      ctx.drawImage(o.img, o.x, o.y, o.w, o.h);
+      ctx.drawImage(preparedImage(o), o.x, o.y, o.w, o.h);
     } else if (o.type === "border") {
       drawBorder(ctx, o.kind, o.x, o.y, o.w, o.h);
     }
@@ -256,6 +259,39 @@ function renderProps() {
     propsEl.querySelector("#p-text").oninput = (e) => { o.text = e.target.value; draw(); };
     propsEl.querySelector("#p-size").oninput = (e) => { o.fontSize = +e.target.value || 12; draw(); };
     propsEl.querySelector("#p-font").onchange = (e) => { o.font = e.target.value; draw(); };
+  } else if (o.type === "image") {
+    propsEl.innerHTML = `
+      <label>Width</label>
+      <input id="p-w" type="number" min="8" value="${Math.round(o.w)}" />
+      <label>Height</label>
+      <input id="p-h" type="number" min="8" value="${Math.round(o.h)}" />
+      <label>Dithering</label>
+      <select id="p-dither">
+        <option value="floyd">Floyd–Steinberg</option>
+        <option value="atkinson">Atkinson</option>
+        <option value="bayer">Ordered (Bayer)</option>
+        <option value="none">None (threshold)</option>
+      </select>
+      <label>Brightness <span id="p-br-v">${o.brightness ?? -10}</span></label>
+      <input id="p-br" type="range" min="-80" max="80" value="${o.brightness ?? -10}" />
+      <label>Contrast <span id="p-ct-v">${o.contrast ?? 40}</span></label>
+      <input id="p-ct" type="range" min="-80" max="80" value="${o.contrast ?? 40}" />`;
+    propsEl.querySelector("#p-dither").value = o.dither || "floyd";
+    propsEl.querySelector("#p-w").oninput = (e) => { o.w = +e.target.value || MIN_SIZE; o._prep = null; draw(); };
+    propsEl.querySelector("#p-h").oninput = (e) => { o.h = +e.target.value || MIN_SIZE; o._prep = null; draw(); };
+    propsEl.querySelector("#p-dither").onchange = (e) => { o.dither = e.target.value; o._prep = null; draw(); };
+    propsEl.querySelector("#p-br").oninput = (e) => {
+      o.brightness = +e.target.value;
+      propsEl.querySelector("#p-br-v").textContent = o.brightness;
+      o._prep = null;
+      draw();
+    };
+    propsEl.querySelector("#p-ct").oninput = (e) => {
+      o.contrast = +e.target.value;
+      propsEl.querySelector("#p-ct-v").textContent = o.contrast;
+      o._prep = null;
+      draw();
+    };
   } else {
     propsEl.innerHTML = `
       <label>Width</label>
@@ -265,6 +301,25 @@ function renderProps() {
     propsEl.querySelector("#p-w").oninput = (e) => { o.w = +e.target.value || MIN_SIZE; draw(); };
     propsEl.querySelector("#p-h").oninput = (e) => { o.h = +e.target.value || MIN_SIZE; draw(); };
   }
+}
+
+function preparedImage(o) {
+  const w = Math.max(1, Math.round(o.w));
+  const h = Math.max(1, Math.round(o.h));
+  const key = `${w}x${h}:${o.dither || "floyd"}:${o.brightness ?? -10}:${o.contrast ?? 40}`;
+  if (o._prep && o._prepKey === key) return o._prep;
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const octx = off.getContext("2d", { willReadFrequently: true });
+  octx.imageSmoothingEnabled = true;
+  octx.drawImage(o.img, 0, 0, w, h);
+  const id = octx.getImageData(0, 0, w, h);
+  ditherImageData(id, o.dither || "floyd", o.brightness ?? -10, o.contrast ?? 40);
+  octx.putImageData(id, 0, 0);
+  o._prep = off;
+  o._prepKey = key;
+  return off;
 }
 
 function canvasPoint(ev) {
@@ -315,6 +370,7 @@ function onPointerMove(ev) {
     const startDist = Math.hypot(drag.startX - ax, drag.startY - ay) || 1;
     const dist = Math.hypot(p.x - ax, p.y - ay);
     applyScale(o, drag.start, dist / startDist, drag.mode);
+    if (o.type === "image") o._prep = null;
   }
   draw();
 }

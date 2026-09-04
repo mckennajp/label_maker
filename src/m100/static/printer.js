@@ -27,11 +27,108 @@ function concatBytes(parts) {
   return out;
 }
 
+const BAYER8 = [
+  [ 0, 32,  8, 40,  2, 34, 10, 42],
+  [48, 16, 56, 24, 50, 18, 58, 26],
+  [12, 44,  4, 36, 14, 46,  6, 38],
+  [60, 28, 52, 20, 62, 30, 54, 22],
+  [ 3, 35, 11, 43,  1, 33,  9, 41],
+  [51, 19, 59, 27, 49, 17, 57, 25],
+  [15, 47,  7, 39, 13, 45,  5, 37],
+  [63, 31, 55, 23, 61, 29, 53, 21],
+];
+
+function clampByte(v) {
+  return v < 0 ? 0 : v > 255 ? 255 : v;
+}
+
+function setMono(data, i, black) {
+  const v = black ? 0 : 255;
+  data[i] = data[i + 1] = data[i + 2] = v;
+  data[i + 3] = 255;
+}
+
+function addErr(buf, w, h, x, y, amount) {
+  if (x < 0 || x >= w || y < 0 || y >= h) return;
+  buf[y * w + x] += amount;
+}
+
+/**
+ * Phomymo-style grayscale: BT.601 luma, alpha over white, gamma 1.3 to lift
+ * midtones so thermal 1-bit dither keeps photo detail.
+ */
+function toThermalGray(data, w, h, brightness, contrast) {
+  const buf = new Float32Array(w * h);
+  const gammaInv = 1 / 1.3;
+  const bMul = 1 + Number(brightness || 0) / 100;
+  const cMul = 1 + Number(contrast || 0) / 100;
+  for (let i = 0; i < w * h; i++) {
+    const p = i * 4;
+    const a = data[p + 3] / 255;
+    let gray = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+    if (a < 1) gray = gray * a + 255 * (1 - a);
+    gray *= bMul;
+    gray = (gray - 128) * cMul + 128;
+    gray = 255 * Math.pow(clampByte(gray) / 255, gammaInv);
+    buf[i] = gray;
+  }
+  return buf;
+}
+
+/** In-place 1-bit dither of ImageData. Dark pixels print (burn). */
+export function ditherImageData(imageData, method = "floyd", brightness = 0, contrast = 0) {
+  const { data, width: w, height: h } = imageData;
+  const n = w * h;
+  const buf = toThermalGray(data, w, h, brightness, contrast);
+  const kind = method || "floyd";
+  if (kind === "none" || kind === "threshold") {
+    for (let i = 0; i < n; i++) setMono(data, i * 4, buf[i] < 128);
+    return imageData;
+  }
+  if (kind === "bayer" || kind === "ordered") {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const t = (BAYER8[y & 7][x & 7] + 0.5) * (255 / 64);
+        setMono(data, (y * w + x) * 4, buf[y * w + x] < t);
+      }
+    }
+    return imageData;
+  }
+  const atkinson = kind === "atkinson";
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const old = buf[idx];
+      const black = old < 128;
+      const neu = black ? 0 : 255;
+      setMono(data, idx * 4, black);
+      const err = old - neu;
+      if (atkinson) {
+        const q = err / 8;
+        addErr(buf, w, h, x + 1, y, q);
+        addErr(buf, w, h, x + 2, y, q);
+        addErr(buf, w, h, x - 1, y + 1, q);
+        addErr(buf, w, h, x, y + 1, q);
+        addErr(buf, w, h, x + 1, y + 1, q);
+        addErr(buf, w, h, x, y + 2, q);
+      } else {
+        addErr(buf, w, h, x + 1, y, (err * 7) / 16);
+        addErr(buf, w, h, x - 1, y + 1, (err * 3) / 16);
+        addErr(buf, w, h, x, y + 1, (err * 5) / 16);
+        addErr(buf, w, h, x + 1, y + 1, (err * 1) / 16);
+      }
+    }
+  }
+  return imageData;
+}
+
 export function encodeFromCanvas(canvas) {
   const srcW = canvas.width;
   const srcH = canvas.height;
-  const ctx = canvas.getContext("2d");
-  const { data } = ctx.getImageData(0, 0, srcW, srcH);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, srcW, srcH);
+  ditherImageData(imageData, "floyd", 0, 0);
+  const { data } = imageData;
   const widthBytes = Math.ceil(HEAD_PX / 8);
   const raster = new Uint8Array(widthBytes * srcH);
   for (let y = 0; y < srcH; y++) {
@@ -39,8 +136,7 @@ export function encodeFromCanvas(canvas) {
       const dx = x + SHIFT_X;
       if (dx < 0 || dx >= HEAD_PX) continue;
       const i = (y * srcW + x) * 4;
-      const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      if (lum < 128) raster[y * widthBytes + (dx >> 3)] |= 0x80 >> (dx & 7);
+      if (data[i] < 128) raster[y * widthBytes + (dx >> 3)] |= 0x80 >> (dx & 7);
     }
   }
   const job = [
