@@ -122,27 +122,44 @@ export function ditherImageData(imageData, method = "floyd", brightness = 0, con
   return imageData;
 }
 
-/** Rotate a portrait design 90° CW onto 40×30 mm stock (full head width). */
-export function toLandscape(canvas) {
-  if (canvas.width >= canvas.height) return canvas;
-  const out = document.createElement("canvas");
-  out.width = canvas.height;
-  out.height = canvas.width;
-  const octx = out.getContext("2d");
-  octx.translate(out.width, 0);
-  octx.rotate(Math.PI / 2);
-  octx.drawImage(canvas, 0, 0);
+function rotateImageData90CW(src) {
+  const w = src.width;
+  const h = src.height;
+  const s = src.data;
+  const out = new ImageData(h, w);
+  const d = out.data;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      const dx = h - 1 - y;
+      const dy = x;
+      const di = (dy * h + dx) * 4;
+      d[di] = s[si];
+      d[di + 1] = s[si + 1];
+      d[di + 2] = s[si + 2];
+      d[di + 3] = s[si + 3];
+    }
+  }
   return out;
 }
 
-export function encodeFromCanvas(canvas) {
-  canvas = toLandscape(canvas);
-  const srcW = canvas.width;
-  const srcH = canvas.height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const imageData = ctx.getImageData(0, 0, srcW, srcH);
+/** Rotate 90° CW with nearest-neighbor pixels (no smoothing). */
+export function toLandscape(canvas) {
+  const ctx = canvas.getContext("2d");
+  const rotated = rotateImageData90CW(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  const out = document.createElement("canvas");
+  out.width = rotated.width;
+  out.height = rotated.height;
+  out.getContext("2d").putImageData(rotated, 0, 0);
+  return out;
+}
+
+export function encodeFromCanvas(canvas, { rotate90 = false } = {}) {
+  const ctx = canvas.getContext("2d");
+  let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   ditherImageData(imageData, "floyd", 0, 0);
-  const { data } = imageData;
+  if (rotate90) imageData = rotateImageData90CW(imageData);
+  const { data, width: srcW, height: srcH } = imageData;
   const widthBytes = Math.ceil(HEAD_PX / 8);
   const raster = new Uint8Array(widthBytes * srcH);
   for (let y = 0; y < srcH; y++) {
@@ -331,8 +348,8 @@ export class BluetoothLink extends BaseLink {
       if (i + this.chunk < u8.length) await sleep(this.paceMs);
     }
   }
-  async printCanvas(canvas, copies = 1) {
-    const job = encodeFromCanvas(canvas);
+  async printCanvas(canvas, copies = 1, opts = {}) {
+    const job = encodeFromCanvas(canvas, opts);
     for (let n = 0; n < copies; n++) {
       this._status.printComplete = false;
       await this.write(job);
@@ -407,8 +424,8 @@ export class SerialLink extends BaseLink {
       if (i + this.chunk < u8.length) await sleep(this.paceMs);
     }
   }
-  async printCanvas(canvas, copies = 1) {
-    const job = encodeFromCanvas(canvas);
+  async printCanvas(canvas, copies = 1, opts = {}) {
+    const job = encodeFromCanvas(canvas, opts);
     for (let n = 0; n < copies; n++) {
       this._status.printComplete = false;
       await this.write(job);

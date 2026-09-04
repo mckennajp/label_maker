@@ -1,10 +1,15 @@
 import { BluetoothLink, SerialLink, bluetoothAvailable, serialAvailable, ditherImageData, toLandscape } from "./printer.js";
 import { BORDERS, drawBorder } from "./borders.js";
 
-const LANDSCAPE = { w: 320, h: 240, wMm: 40, hMm: 30 };
-const PORTRAIT = { w: 240, h: 320, wMm: 30, hMm: 40 };
-let W = LANDSCAPE.w;
-let H = LANDSCAPE.h;
+const SIZES = {
+  "40x30": { id: "40x30", w: 320, h: 240, wMm: 40, hMm: 30, rotatePrint: false },
+  "30x40": { id: "30x40", w: 240, h: 320, wMm: 30, hMm: 40, rotatePrint: true },
+  "40x60": { id: "40x60", w: 320, h: 480, wMm: 40, hMm: 60, rotatePrint: false },
+  "60x40": { id: "60x40", w: 480, h: 320, wMm: 60, hMm: 40, rotatePrint: true },
+};
+let size = SIZES["40x30"];
+let W = size.w;
+let H = size.h;
 const MIN_SIZE = 8;
 
 function handleSize() {
@@ -35,24 +40,21 @@ function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-function isPortrait() {
-  return H > W;
-}
-
 function mmLabel() {
-  return isPortrait() ? PORTRAIT : LANDSCAPE;
+  return size;
 }
 
 function applyCanvasSize() {
   canvas.width = W;
   canvas.height = H;
-  document.body.classList.toggle("portrait", isPortrait());
+  document.body.classList.remove("size-40x30", "size-30x40", "size-40x60", "size-60x40");
+  document.body.classList.add("size-" + size.id);
   const hint = document.querySelector(".hint");
   if (hint) {
-    hint.textContent = `${mmLabel().wMm} × ${mmLabel().hMm} mm · paste or add an image · drag to move · corner handles to scale`;
+    hint.textContent = `${size.wMm} × ${size.hMm} mm · paste or add an image · drag to move · corner handles to scale`;
   }
-  const btn = document.getElementById("orient");
-  if (btn) btn.textContent = isPortrait() ? "Landscape" : "Portrait";
+  const sel = document.getElementById("label-size");
+  if (sel) sel.value = size.id;
 }
 
 function clampObjects() {
@@ -75,8 +77,9 @@ function clampObjects() {
   }
 }
 
-function toggleOrientation() {
-  const next = isPortrait() ? LANDSCAPE : PORTRAIT;
+function setLabelSize(id) {
+  const next = SIZES[id] || SIZES["40x30"];
+  size = next;
   W = next.w;
   H = next.h;
   applyCanvasSize();
@@ -158,6 +161,7 @@ function addText() {
   selected = objects.length - 1;
   draw();
   renderProps();
+  try { canvas.focus({ preventScroll: true }); } catch { canvas.focus(); }
 }
 
 function addQr() {
@@ -542,6 +546,7 @@ function endDrag() {
 
 canvas.addEventListener("pointerdown", (ev) => {
   ev.preventDefault();
+  try { canvas.focus({ preventScroll: true }); } catch { canvas.focus(); }
   const p = canvasPoint(ev);
   let handle = null;
   if (selected >= 0) handle = hitHandle(p.x, p.y, bounds(objects[selected]));
@@ -614,7 +619,7 @@ document.querySelector("[data-add=text]").onclick = addText;
 document.getElementById("add-image").onclick = () => document.getElementById("file").click();
 document.getElementById("add-qr").onclick = addQr;
 document.getElementById("add-border").onclick = openBorderGallery;
-document.getElementById("orient").onclick = toggleOrientation;
+document.getElementById("label-size").onchange = (e) => setLabelSize(e.target.value);
 document.getElementById("border-close").onclick = () => {
   document.getElementById("border-modal").hidden = true;
 };
@@ -658,9 +663,23 @@ deleteBtn.onclick = () => {
 frontBtn.onclick = () => moveLayer(true);
 backBtn.onclick = () => moveLayer(false);
 
+function isTypingTarget(el) {
+  if (!el || el === canvas || el === document.body) return false;
+  const tag = el.tagName;
+  if (tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable) return true;
+  if (tag === "INPUT") {
+    const t = (el.type || "text").toLowerCase();
+    return t === "text" || t === "search" || t === "url" || t === "number" || t === "password" || t === "";
+  }
+  return false;
+}
+
 document.addEventListener("keydown", (e) => {
-  if (e.target !== document.body && e.target !== canvas) return;
-  if ((e.key === "Delete" || e.key === "Backspace") && selected >= 0) deleteBtn.click();
+  if (isTypingTarget(e.target)) return;
+  if ((e.key === "Delete" || e.key === "Backspace") && selected >= 0) {
+    e.preventDefault();
+    deleteBtn.click();
+  }
   if ((e.key === "]" || e.key === ".") && selected >= 0) moveLayer(true);
   if ((e.key === "[" || e.key === ",") && selected >= 0) moveLayer(false);
 });
@@ -769,15 +788,19 @@ printBtn.onclick = async () => {
   try {
     if (link) {
       draw(true);
-      const st = await link.printCanvas(canvas, copies);
+      const st = await link.printCanvas(canvas, copies, { rotate90: size.rotatePrint });
       draw();
       toast(st.printComplete ? "Printed" : "Sent — check the printer");
     } else {
       draw(true);
-      const sheet = toLandscape(canvas);
+      const sheet = size.rotatePrint ? toLandscape(canvas) : canvas;
       const blob = await new Promise((res) => sheet.toBlob(res, "image/png"));
       draw();
-      const r = await fetch("/api/print?copies=" + copies + "&width_mm=40&height_mm=30", {
+      const printW = size.rotatePrint ? size.hMm : size.wMm;
+      const printH = size.rotatePrint ? size.wMm : size.hMm;
+      const r = await fetch(
+        `/api/print?copies=${copies}&width_mm=${printW}&height_mm=${printH}`,
+        {
         method: "POST",
         headers: { "Content-Type": "image/png" },
         body: blob,

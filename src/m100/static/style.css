@@ -36,6 +36,21 @@ header {
 .status.ok { color: var(--ok); }
 .status.bad { color: var(--danger); }
 .copies { color: var(--muted); font-size: 12px; }
+.size-pick {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.size-pick select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 6px;
+}
 .copies input {
   width: 3.2em;
   margin-left: 6px;
@@ -121,17 +136,25 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   width: 640px;
   height: 480px;
   background: #fff;
-}
-body.portrait #label {
-  width: 480px;
-  height: 640px;
-}
   cursor: default;
   image-rendering: pixelated;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  outline: none;
+}
+body.size-30x40 #label {
+  width: 480px;
+  height: 640px;
+}
+body.size-40x60 #label {
+  width: 426px;
+  height: 640px;
+}
+body.size-60x40 #label {
+  width: 720px;
+  height: 480px;
 }
 .hint { color: var(--muted); font-size: 12px; margin-top: 14px; }
 
@@ -237,9 +260,13 @@ body.portrait #label {
     height: auto;
     aspect-ratio: 320 / 240;
   }
-  body.portrait #label {
-    width: 100%;
-    height: auto;
+  body.size-30x40 #label {
     aspect-ratio: 240 / 320;
+  }
+  body.size-40x60 #label {
+    aspect-ratio: 320 / 480;
+  }
+  body.size-60x40 #label {
+    aspect-ratio: 480 / 320;
   }
 }
