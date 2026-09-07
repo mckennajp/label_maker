@@ -21,6 +21,8 @@ Protocol references:
 
 Full notes: [`docs/findings.md`](docs/findings.md), [`field-notes.md`](field-notes.md).
 
+<img width="1656" height="1501" alt="image" src="https://github.com/user-attachments/assets/35eac307-296d-41dd-a5b8-2ccecf0f9a90" />
+
 ## Print from Python
 
 ```powershell
