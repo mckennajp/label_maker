@@ -36,11 +36,40 @@ header {
 .status.ok { color: var(--ok); }
 .status.bad { color: var(--danger); }
 .copies { color: var(--muted); font-size: 12px; }
+.settings {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.settings summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.settings summary::-webkit-details-marker { display: none; }
+.settings summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--muted);
+}
+.settings[open] summary::before {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--muted);
+  border-bottom: 0;
+}
 .size-pick {
   display: block;
   color: var(--muted);
   font-size: 12px;
-  margin-bottom: 8px;
+  margin: 8px 0 0;
 }
 .size-pick select {
   display: block;
@@ -76,6 +105,40 @@ aside button, #delete, #bring-front, #send-back {
   text-align: left;
   margin-bottom: 8px;
 }
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  text-align: center;
+  margin-bottom: 0;
+}
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+header .icon-btn {
+  width: 38px;
+  height: 34px;
+}
+.tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.tool-row .icon-btn {
+  width: 32px;
+  flex: 0 0 32px;
+}
+#toggle-grid[aria-pressed="true"] {
+  background: var(--accent);
+  color: #1b1c1e;
+  border-color: var(--accent);
+}
 #print { margin-left: auto; }
 #connect-bt, #connect-serial {
   background: transparent;
@@ -91,11 +154,11 @@ aside button, #delete, #bring-front, #send-back {
 main {
   flex: 1;
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 220px 1fr;
   min-height: 0;
 }
 aside {
-  padding: 16px;
+  padding: 12px;
   border-right: 1px solid var(--line);
   background: var(--panel);
 }
@@ -251,8 +314,9 @@ body.size-60x40 #label {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  aside hr, aside .props { grid-column: 1 / -1; }
+  aside hr, aside .props, aside .settings { grid-column: 1 / -1; }
   aside button { margin-bottom: 0; }
+  .tool-row { grid-column: 1 / -1; }
   /* Keep gutters around the canvas so portrait labels don't eat the
      whole viewport — touches on the canvas are captured for editing. */
   .stage { padding: 16px 28px; }

@@ -35,6 +35,7 @@ let lastError = "";
 let objects = [];
 let selected = -1;
 let drag = null;
+let showGrid = false;
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -337,10 +338,42 @@ function cursorFor(ev) {
   return "default";
 }
 
+function drawGrid() {
+  const pxPerMm = W / size.wMm;
+  const minor = pxPerMm;
+  const major = pxPerMm * 5;
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(47, 111, 235, 0.18)";
+  ctx.beginPath();
+  for (let x = minor; x < W; x += minor) {
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, H);
+  }
+  for (let y = minor; y < H; y += minor) {
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(W, y + 0.5);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(47, 111, 235, 0.38)";
+  ctx.beginPath();
+  for (let x = major; x < W; x += major) {
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, H);
+  }
+  for (let y = major; y < H; y += major) {
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(W, y + 0.5);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function draw(exporting = false) {
   ctx.save();
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, W, H);
+  if (showGrid && !exporting) drawGrid();
   for (const o of objects) {
     if (o.type === "text") {
       ctx.fillStyle = "#000";
@@ -619,6 +652,14 @@ document.querySelector("[data-add=text]").onclick = addText;
 document.getElementById("add-image").onclick = () => document.getElementById("file").click();
 document.getElementById("add-qr").onclick = addQr;
 document.getElementById("add-border").onclick = openBorderGallery;
+document.getElementById("toggle-grid").onclick = () => {
+  showGrid = !showGrid;
+  const btn = document.getElementById("toggle-grid");
+  btn.setAttribute("aria-pressed", showGrid ? "true" : "false");
+  btn.title = showGrid ? "Hide grid" : "Show grid";
+  btn.setAttribute("aria-label", btn.title);
+  draw();
+};
 document.getElementById("label-size").onchange = (e) => setLabelSize(e.target.value);
 document.getElementById("border-close").onclick = () => {
   document.getElementById("border-modal").hidden = true;
