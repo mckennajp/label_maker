@@ -253,18 +253,29 @@ body.size-60x40 #label {
   }
   aside hr, aside .props { grid-column: 1 / -1; }
   aside button { margin-bottom: 0; }
-  .stage { padding: 12px; }
-  .label-wrap { padding: 12px; width: 100%; }
+  /* Keep gutters around the canvas so portrait labels don't eat the
+     whole viewport — touches on the canvas are captured for editing. */
+  .stage { padding: 16px 28px; }
+  .label-wrap {
+    padding: 8px;
+    width: auto;
+    max-width: 100%;
+    touch-action: pan-y;
+  }
   #label {
-    width: 100%;
+    width: auto;
     height: auto;
+    max-width: calc(100vw - 88px);
+    max-height: 46vh;
     aspect-ratio: 320 / 240;
   }
   body.size-30x40 #label {
     aspect-ratio: 240 / 320;
+    max-height: 42vh;
   }
   body.size-40x60 #label {
     aspect-ratio: 320 / 480;
+    max-height: 42vh;
   }
   body.size-60x40 #label {
     aspect-ratio: 480 / 320;
