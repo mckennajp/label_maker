@@ -6,7 +6,7 @@ const RX = "0000ff03-0000-1000-8000-00805f9b34fb";
 const ADV_AF30 = "0000af30-0000-1000-8000-00805f9b34fb";
 
 const HEAD_PX = 384;
-const SHIFT_X = Math.round(3.5 / 25.4 * 203);
+const SHIFT_X = Math.round(4.8 / 25.4 * 203);
 const SPEED = 3;
 const DENSITY = 10;
 const MEDIA_GAP = 0x0a;
