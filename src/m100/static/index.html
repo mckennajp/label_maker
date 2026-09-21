@@ -19,6 +19,13 @@
     <button id="disconnect" type="button" class="icon-btn" hidden title="Disconnect" aria-label="Disconnect">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8l-8 8M8 8l8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
+    <button id="save-label" type="button" class="icon-btn" title="Save label" aria-label="Save label">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 4v5h8V4M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+    </button>
+    <button id="load-label" type="button" class="icon-btn" title="Load label" aria-label="Load label">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6h6l2 2h8v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 10h16v8H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+    </button>
+    <input id="load-file" type="file" accept="application/json,.json" hidden />
     <label class="copies">Copies <input id="copies" type="number" min="1" max="20" value="1" /></label>
     <button id="print" type="button">Print</button>
   </header>
@@ -62,6 +69,9 @@
             <option value="30x40">30 × 40 mm</option>
             <option value="40x60">40 × 60 mm</option>
             <option value="60x40">60 × 40 mm</option>
+            <option value="50x80">50 × 80 mm</option>
+            <option value="80x50">80 × 50 mm</option>
+            <option value="50x50">50 × 50 mm round</option>
           </select>
         </label>
       </details>

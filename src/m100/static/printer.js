@@ -162,9 +162,11 @@ export function encodeFromCanvas(canvas, { rotate90 = false } = {}) {
   const { data, width: srcW, height: srcH } = imageData;
   const widthBytes = Math.ceil(HEAD_PX / 8);
   const raster = new Uint8Array(widthBytes * srcH);
+  let ox = SHIFT_X;
+  if (srcW + ox > HEAD_PX) ox = Math.floor((HEAD_PX - srcW) / 2);
   for (let y = 0; y < srcH; y++) {
     for (let x = 0; x < srcW; x++) {
-      const dx = x + SHIFT_X;
+      const dx = x + ox;
       if (dx < 0 || dx >= HEAD_PX) continue;
       const i = (y * srcW + x) * 4;
       if (data[i] < 128) raster[y * widthBytes + (dx >> 3)] |= 0x80 >> (dx & 7);

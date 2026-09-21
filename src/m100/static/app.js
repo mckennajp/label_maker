@@ -1,11 +1,18 @@
 import { BluetoothLink, SerialLink, bluetoothAvailable, serialAvailable, ditherImageData, toLandscape } from "./printer.js";
 import { BORDERS, drawBorder } from "./borders.js";
 
+const PX_PER_MM = 8;
+function mmPx(mm) {
+  return Math.round(mm * PX_PER_MM);
+}
 const SIZES = {
-  "40x30": { id: "40x30", w: 320, h: 240, wMm: 40, hMm: 30, rotatePrint: false },
-  "30x40": { id: "30x40", w: 240, h: 320, wMm: 30, hMm: 40, rotatePrint: true },
-  "40x60": { id: "40x60", w: 320, h: 480, wMm: 40, hMm: 60, rotatePrint: false },
-  "60x40": { id: "60x40", w: 480, h: 320, wMm: 60, hMm: 40, rotatePrint: true },
+  "40x30": { id: "40x30", w: mmPx(40), h: mmPx(30), wMm: 40, hMm: 30, rotatePrint: false },
+  "30x40": { id: "30x40", w: mmPx(30), h: mmPx(40), wMm: 30, hMm: 40, rotatePrint: true },
+  "40x60": { id: "40x60", w: mmPx(40), h: mmPx(60), wMm: 40, hMm: 60, rotatePrint: false },
+  "60x40": { id: "60x40", w: mmPx(60), h: mmPx(40), wMm: 60, hMm: 40, rotatePrint: true },
+  "50x80": { id: "50x80", w: mmPx(50), h: mmPx(80), wMm: 50, hMm: 80, rotatePrint: false },
+  "80x50": { id: "80x50", w: mmPx(80), h: mmPx(50), wMm: 80, hMm: 50, rotatePrint: true },
+  "50x50": { id: "50x50", w: mmPx(50), h: mmPx(50), wMm: 50, hMm: 50, rotatePrint: false, round: true },
 };
 let size = SIZES["40x30"];
 let W = size.w;
@@ -48,11 +55,16 @@ function mmLabel() {
 function applyCanvasSize() {
   canvas.width = W;
   canvas.height = H;
-  document.body.classList.remove("size-40x30", "size-30x40", "size-40x60", "size-60x40");
+  const scale = Math.min(720 / W, 640 / H, 2);
+  document.body.style.setProperty("--label-css-w", Math.round(W * scale) + "px");
+  document.body.style.setProperty("--label-css-h", Math.round(H * scale) + "px");
+  document.body.style.setProperty("--label-ar", `${W} / ${H}`);
+  for (const id of Object.keys(SIZES)) document.body.classList.remove("size-" + id);
   document.body.classList.add("size-" + size.id);
   const hint = document.querySelector(".hint");
   if (hint) {
-    hint.textContent = `${size.wMm} × ${size.hMm} mm · paste or add an image · drag to move · corner handles to scale`;
+    const shape = size.round ? " round" : "";
+    hint.textContent = `${size.wMm} × ${size.hMm} mm${shape} · paste or add an image · drag to move · corner handles to scale`;
   }
   const sel = document.getElementById("label-size");
   if (sel) sel.value = size.id;
@@ -127,13 +139,15 @@ function openBorderGallery() {
       const btn = document.createElement("button");
       btn.type = "button";
       const preview = document.createElement("canvas");
-      preview.width = 160;
-      preview.height = 120;
+      const pw = 160;
+      const ph = Math.max(80, Math.round(160 * H / W));
+      preview.width = pw;
+      preview.height = ph;
       const pctx = preview.getContext("2d");
       pctx.fillStyle = "#fff";
-      pctx.fillRect(0, 0, 160, 120);
+      pctx.fillRect(0, 0, pw, ph);
       pctx.save();
-      pctx.scale(160 / W, 120 / H);
+      pctx.scale(pw / W, ph / H);
       drawBorder(pctx, spec.id, 6, 6, W - 12, H - 12);
       pctx.restore();
       const label = document.createElement("span");
@@ -369,6 +383,25 @@ function drawGrid() {
   ctx.restore();
 }
 
+function drawRoundGuide() {
+  const r = Math.min(W, H) / 2;
+  const cx = W / 2;
+  const cy = H / 2;
+  ctx.save();
+  ctx.fillStyle = "rgba(27, 28, 30, 0.14)";
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = "rgba(80, 80, 80, 0.75)";
+  ctx.lineWidth = 1;
+  ctx.arc(cx, cy, r - 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function draw(exporting = false) {
   ctx.save();
   ctx.fillStyle = "#fff";
@@ -388,6 +421,7 @@ function draw(exporting = false) {
       drawBorder(ctx, o.kind, o.x, o.y, o.w, o.h);
     }
   }
+  if (size.round && !exporting) drawRoundGuide();
   if (!exporting && selected >= 0) {
     const b = bounds(objects[selected]);
     ctx.strokeStyle = "#2f6feb";
@@ -661,6 +695,119 @@ document.getElementById("toggle-grid").onclick = () => {
   draw();
 };
 document.getElementById("label-size").onchange = (e) => setLabelSize(e.target.value);
+
+function imageDataUrl(img) {
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth || img.width;
+  c.height = img.naturalHeight || img.height;
+  c.getContext("2d").drawImage(img, 0, 0);
+  return c.toDataURL("image/png");
+}
+
+function serializeDesign() {
+  return {
+    version: 1,
+    size: size.id,
+    objects: objects.map((o) => {
+      if (o.type === "text") {
+        return { type: "text", x: o.x, y: o.y, text: o.text, fontSize: o.fontSize, font: o.font };
+      }
+      if (o.type === "qr") {
+        return { type: "qr", x: o.x, y: o.y, w: o.w, h: o.h, text: o.text };
+      }
+      if (o.type === "border") {
+        return { type: "border", kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h };
+      }
+      if (o.type === "image" && o.img) {
+        return {
+          type: "image",
+          x: o.x,
+          y: o.y,
+          w: o.w,
+          h: o.h,
+          dither: o.dither,
+          brightness: o.brightness,
+          contrast: o.contrast,
+          src: imageDataUrl(o.img),
+        };
+      }
+      return null;
+    }).filter(Boolean),
+  };
+}
+
+function loadImageSrc(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not read a saved image"));
+    img.src = src;
+  });
+}
+
+async function applyDesign(data) {
+  if (!data || data.version !== 1 || !Array.isArray(data.objects)) {
+    throw new Error("Not a label file");
+  }
+  if (data.size) setLabelSize(data.size);
+  const next = [];
+  for (const o of data.objects) {
+    const id = uid();
+    if (o.type === "text") {
+      next.push({ id, type: "text", x: +o.x || 0, y: +o.y || 0, text: String(o.text ?? ""), fontSize: +o.fontSize || 36, font: o.font || "Arial" });
+    } else if (o.type === "qr") {
+      next.push({ id, type: "qr", x: +o.x || 0, y: +o.y || 0, w: +o.w || 80, h: +o.h || 80, text: String(o.text ?? "") });
+    } else if (o.type === "border") {
+      next.push({ id, type: "border", kind: o.kind, x: +o.x || 4, y: +o.y || 4, w: +o.w || W - 8, h: +o.h || H - 8 });
+    } else if (o.type === "image" && o.src) {
+      const img = await loadImageSrc(o.src);
+      next.push({
+        id,
+        type: "image",
+        x: +o.x || 0,
+        y: +o.y || 0,
+        w: +o.w || img.width,
+        h: +o.h || img.height,
+        img,
+        dither: o.dither || "floyd",
+        brightness: +o.brightness || 0,
+        contrast: +o.contrast || 0,
+      });
+    }
+  }
+  objects = next;
+  selected = objects.length ? 0 : -1;
+  clampObjects();
+  draw();
+  renderProps();
+}
+
+document.getElementById("save-label").onclick = () => {
+  const blob = new Blob([JSON.stringify(serializeDesign())], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `label-${size.id}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  toast("Saved " + a.download);
+};
+
+document.getElementById("load-label").onclick = () => {
+  document.getElementById("load-file").click();
+};
+
+document.getElementById("load-file").onchange = async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    await applyDesign(data);
+    toast("Loaded " + file.name);
+  } catch (err) {
+    toast(String(err.message || err));
+  }
+};
 document.getElementById("border-close").onclick = () => {
   document.getElementById("border-modal").hidden = true;
 };

@@ -46,7 +46,7 @@ class Geometry:
 
     @property
     def page_w_px(self) -> int:
-        return max(self.head_px, self.label_w_px + self.shift_x_px)
+        return self.head_px
 
     @property
     def page_h_px(self) -> int:
@@ -100,7 +100,10 @@ def fit_to_label(image: Image.Image, geo: Geometry) -> Image.Image:
     oy = (box_h - src.height) // 2
     label.paste(src, (ox, oy))
     page = Image.new("1", (geo.page_w_px, geo.page_h_px), 0)
-    page.paste(label, (geo.shift_x_px, geo.pad_top_px))
+    shift = geo.shift_x_px
+    if shift + box_w > geo.head_px:
+        shift = (geo.head_px - box_w) // 2
+    page.paste(label, (shift, geo.pad_top_px))
     return page
 
 

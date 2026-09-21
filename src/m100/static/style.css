@@ -140,7 +140,7 @@ header .icon-btn {
   border-color: var(--accent);
 }
 #print { margin-left: auto; }
-#connect-bt, #connect-serial {
+#connect-bt, #connect-serial, #save-label, #load-label {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
@@ -196,8 +196,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   touch-action: none;
 }
 #label {
-  width: 640px;
-  height: 480px;
+  width: var(--label-css-w, 640px);
+  height: var(--label-css-h, 480px);
   background: #fff;
   cursor: default;
   image-rendering: pixelated;
@@ -206,18 +206,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   outline: none;
-}
-body.size-30x40 #label {
-  width: 480px;
-  height: 640px;
-}
-body.size-40x60 #label {
-  width: 426px;
-  height: 640px;
-}
-body.size-60x40 #label {
-  width: 720px;
-  height: 480px;
 }
 .hint { color: var(--muted); font-size: 12px; margin-top: 14px; }
 
@@ -290,7 +278,7 @@ body.size-60x40 #label {
 .gallery canvas {
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--label-ar, 4 / 3);
   background: #fff;
 }
 .gallery span { font-size: 12px; font-weight: 600; }
@@ -331,17 +319,11 @@ body.size-60x40 #label {
     height: auto;
     max-width: calc(100vw - 88px);
     max-height: 46vh;
-    aspect-ratio: 320 / 240;
+    aspect-ratio: var(--label-ar, 320 / 240);
   }
-  body.size-30x40 #label {
-    aspect-ratio: 240 / 320;
+  body.size-30x40 #label,
+  body.size-40x60 #label,
+  body.size-50x80 #label {
     max-height: 42vh;
-  }
-  body.size-40x60 #label {
-    aspect-ratio: 320 / 480;
-    max-height: 42vh;
-  }
-  body.size-60x40 #label {
-    aspect-ratio: 480 / 320;
   }
 }
